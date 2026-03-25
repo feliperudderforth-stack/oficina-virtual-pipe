@@ -74,6 +74,12 @@ interface OfficeState {
   callPeers: string[];
   addCallPeer: (peerId: string) => void;
   removeCallPeer: (peerId: string) => void;
+
+  // Interaction state
+  interactionPrompt: { furnitureId: string; label: string; roomId: string } | null;
+  setInteractionPrompt: (prompt: { furnitureId: string; label: string; roomId: string } | null) => void;
+  sitDown: (furnitureId: string) => void;
+  standUp: () => void;
 }
 
 export const useOfficeStore = create<OfficeState>((set, get) => ({
@@ -223,4 +229,20 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
   callPeers: [],
   addCallPeer: (peerId) => set((state) => ({ callPeers: [...state.callPeers, peerId] })),
   removeCallPeer: (peerId) => set((state) => ({ callPeers: state.callPeers.filter(id => id !== peerId) })),
+
+  // Interaction
+  interactionPrompt: null,
+  setInteractionPrompt: (prompt) => set({ interactionPrompt: prompt }),
+  sitDown: (furnitureId) => {
+    const user = get().currentUser;
+    if (user) {
+      set({ currentUser: { ...user, isSitting: true, sittingFurnitureId: furnitureId } });
+    }
+  },
+  standUp: () => {
+    const user = get().currentUser;
+    if (user) {
+      set({ currentUser: { ...user, isSitting: false, sittingFurnitureId: null } });
+    }
+  },
 }));

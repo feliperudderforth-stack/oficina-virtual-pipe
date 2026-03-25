@@ -38,6 +38,8 @@ export interface User {
   isCameraOn: boolean;
   isScreenSharing: boolean;
   lastActivity: number;
+  isSitting: boolean;
+  sittingFurnitureId: string | null;
 }
 
 // ─── Room ────────────────────────────────────────────────────────────────────
@@ -66,9 +68,11 @@ export interface RoomLayout {
   furniture: FurnitureItem[];
 }
 
+export type FurnitureType = 'desk' | 'chair' | 'table' | 'sofa' | 'plant' | 'screen' | 'whiteboard' | 'coffee-machine' | 'bookshelf' | 'lamp' | 'printer' | 'water-cooler';
+
 export interface FurnitureItem {
   id: string;
-  type: 'desk' | 'chair' | 'table' | 'sofa' | 'plant' | 'screen' | 'whiteboard' | 'coffee-machine' | 'bookshelf' | 'lamp' | 'printer' | 'water-cooler';
+  type: FurnitureType;
   x: number;
   y: number;
   width: number;
@@ -76,6 +80,8 @@ export interface FurnitureItem {
   rotation?: number;
   color?: string;
   interactive?: boolean;
+  sittable?: boolean;
+  occupiedBy?: string | null;
 }
 
 // ─── Chat ────────────────────────────────────────────────────────────────────
