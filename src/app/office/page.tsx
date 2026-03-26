@@ -4,8 +4,10 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOfficeStore } from '@/stores/useOfficeStore';
 import { getSocket, connectSocket, disconnectSocket } from '@/lib/socket';
-import OfficeCanvas from '@/components/office/OfficeCanvas';
+import dynamic from 'next/dynamic';
 import MiniMap from '@/components/office/MiniMap';
+
+const OfficeCanvas3D = dynamic(() => import('@/components/office/OfficeCanvas3D'), { ssr: false });
 import Toolbar from '@/components/ui/Toolbar';
 import ChatPanel from '@/components/chat/ChatPanel';
 import PeoplePanel from '@/components/sidebar/PeoplePanel';
@@ -387,7 +389,7 @@ export default function OfficePage() {
 
       {/* Main Canvas Area */}
       <div className="flex-1 relative">
-        <OfficeCanvas />
+        <OfficeCanvas3D />
         <RoomInfoBar />
         <MiniMap />
 
@@ -409,7 +411,7 @@ export default function OfficePage() {
               <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[9px] font-mono mx-0.5">A</kbd>
               <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[9px] font-mono">S</kbd>
               <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[9px] font-mono ml-0.5">D</kbd>
-              {' '}or arrow keys to move · Click to teleport
+              {' '}to move · <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[9px] font-mono">E</kbd> to sit/stand
             </p>
           </div>
         </div>
