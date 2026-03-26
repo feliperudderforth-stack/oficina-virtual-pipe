@@ -1,6 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+function getSocketUrl(): string {
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) return process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (typeof window !== 'undefined' && window.location.hostname.includes('.app.github.dev')) {
+    // Codespaces: derive socket URL from current hostname
+    return window.location.origin.replace('-3002.', '-3001.').replace('-3000.', '-3001.');
+  }
+  return 'http://localhost:3001';
+}
+
+const SOCKET_URL = getSocketUrl();
 
 let socket: Socket | null = null;
 
