@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOfficeStore } from '@/stores/useOfficeStore';
-import { getSocket, connectSocket, disconnectSocket } from '@/lib/socket';
+import { getSocket, connectSocket, connectWithTimeout, disconnectSocket, isOfflineMode } from '@/lib/socket';
 import dynamic from 'next/dynamic';
 import MiniMap from '@/components/office/MiniMap';
 
@@ -29,11 +29,16 @@ import type { User, Room, Channel, ChatMessage, Notification } from '@/types';
 function ConnectionStatus({ isConnected }: { isConnected: boolean }) {
   if (isConnected) return null;
 
+  const offline = isOfflineMode();
+
   return (
-    <div className="fixed top-0 inset-x-0 z-[90] bg-amber-500 text-amber-900 text-xs font-medium text-center py-1.5 flex items-center justify-center gap-2">
+    <div className={cn(
+      'fixed top-0 inset-x-0 z-[90] text-xs font-medium text-center py-1.5 flex items-center justify-center gap-2',
+      offline ? 'bg-blue-500 text-white' : 'bg-amber-500 text-amber-900'
+    )}>
       <WifiOff className="w-3.5 h-3.5" />
-      Reconnecting to server...
-      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      {offline ? 'Offline Mode — Explore the office freely. Multiplayer features disabled.' : 'Reconnecting to server...'}
+      {!offline && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
     </div>
   );
 }
@@ -107,7 +112,7 @@ export default function OfficePage() {
     removeCallPeer,
   } = useOfficeStore();
 
-  // Check auth and initialize socket
+  // Check auth and initialize socket (with offline fallback)
   useEffect(() => {
     if (socketInitialized.current) return;
     socketInitialized.current = true;
@@ -119,7 +124,53 @@ export default function OfficePage() {
     }
 
     const userData = JSON.parse(stored);
-    const socket = connectSocket();
+
+    // Generate a consistent color from name
+    const colors = ['#4263eb', '#7048e8', '#be4bdb', '#fa5252', '#40c057', '#fd7e14', '#15aabf', '#e64980'];
+    const colorIdx = userData.name.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % colors.length;
+
+    // Try to connect to server; fall back to offline mode after timeout
+    connectWithTimeout().then((connected) => {
+      if (!connected) {
+        // OFFLINE MODE: Create a local user so the 3D office loads
+        const offlineUser: User = {
+          id: `offline-${Date.now()}`,
+          name: userData.name || 'Explorer',
+          email: userData.email || '',
+          avatar: (userData.name || 'E').charAt(0).toUpperCase(),
+          color: colors[colorIdx],
+          position: { x: 780, y: 420 },
+          direction: 'down',
+          status: 'available',
+          currentRoom: 'open-workspace',
+          role: 'member',
+          department: userData.department || 'General',
+          title: userData.title || 'Team Member',
+          isTyping: false,
+          isSpeaking: false,
+          isMuted: true,
+          isCameraOn: false,
+          isScreenSharing: false,
+          lastActivity: Date.now(),
+          isSitting: false,
+          sittingFurnitureId: null,
+        };
+
+        setCurrentUser(offlineUser);
+        setConnected(false);
+
+        addNotification({
+          id: `offline-${Date.now()}`,
+          title: 'Offline Mode',
+          body: 'Server unreachable. You can explore the 3D office. Multiplayer features disabled.',
+          type: 'system',
+          timestamp: Date.now(),
+          read: false,
+        });
+      }
+    });
+
+    const socket = getSocket();
 
     // Connection events
     socket.on('connect', () => {
@@ -317,15 +368,18 @@ export default function OfficePage() {
       const state = useOfficeStore.getState();
       if (!state.currentUser) return;
 
-      socket.emit('user:move', {
-        position: state.currentUser.position,
-        direction: state.currentUser.direction,
-      });
+      // Only send socket events if connected
+      if (!isOfflineMode() && socket.connected) {
+        socket.emit('user:move', {
+          position: state.currentUser.position,
+          direction: state.currentUser.direction,
+        });
 
-      // Check room transitions
-      const room = getRoomAt(state.currentUser.position.x, state.currentUser.position.y);
-      if (room && room.id !== state.currentUser.currentRoom) {
-        socket.emit('room:join', { roomId: room.id });
+        // Check room transitions
+        const room = getRoomAt(state.currentUser.position.x, state.currentUser.position.y);
+        if (room && room.id !== state.currentUser.currentRoom) {
+          socket.emit('room:join', { roomId: room.id });
+        }
       }
 
       // Proximity walk-up-to-talk events
