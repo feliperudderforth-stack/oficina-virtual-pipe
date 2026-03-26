@@ -312,6 +312,8 @@ const Room3D = React.memo(function Room3D({ room }: { room: RoomLayout }) {
 
 // ─── Avatar 3D (Dark Hoodie) ────────────────────────────────────────────────
 function Avatar3D({ user, isCurrentUser, isSitting }: { user: User; isCurrentUser: boolean; isSitting: boolean }) {
+  const isFocused = user.status === 'dnd' || user.status === 'busy';
+  const avatarOpacity = isFocused && !isCurrentUser ? 0.4 : 1;
   const meshRef = useRef<THREE.Group>(null);
   const x = user.position.x * SCALE;
   const z = user.position.y * SCALE;
@@ -351,32 +353,40 @@ function Avatar3D({ user, isCurrentUser, isSitting }: { user: User; isCurrentUse
         </mesh>
       )}
 
+      {/* Focus mode aura */}
+      {isFocused && (
+        <mesh position={[0, 0.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.07, 0.09, 32]} />
+          <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.6} transparent opacity={0.5} />
+        </mesh>
+      )}
+
       {/* Body - dark hoodie */}
       <mesh position={[0, 0.18, 0]} castShadow>
         <capsuleGeometry args={[0.035, 0.08, 4, 12]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.85} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.85} transparent opacity={avatarOpacity} />
       </mesh>
 
       {/* Hoodie hood */}
       <mesh position={[0, 0.32, -0.01]} castShadow>
         <sphereGeometry args={[0.04, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
-        <meshStandardMaterial color="#1a1a2e" roughness={0.85} />
+        <meshStandardMaterial color="#1a1a2e" roughness={0.85} transparent opacity={avatarOpacity} />
       </mesh>
 
       {/* Head */}
       <mesh position={[0, 0.32, 0]} castShadow>
         <sphereGeometry args={[0.035, 16, 16]} />
-        <meshStandardMaterial color={user.color || '#4263eb'} roughness={0.5} />
+        <meshStandardMaterial color={user.color || '#4263eb'} roughness={0.5} transparent opacity={avatarOpacity} />
       </mesh>
 
       {/* Arms (dark sleeves) */}
       <mesh position={[-0.045, 0.18, 0]} castShadow>
         <capsuleGeometry args={[0.012, 0.06, 3, 8]} />
-        <meshStandardMaterial color="#252540" roughness={0.85} />
+        <meshStandardMaterial color="#252540" roughness={0.85} transparent opacity={avatarOpacity} />
       </mesh>
       <mesh position={[0.045, 0.18, 0]} castShadow>
         <capsuleGeometry args={[0.012, 0.06, 3, 8]} />
-        <meshStandardMaterial color="#252540" roughness={0.85} />
+        <meshStandardMaterial color="#252540" roughness={0.85} transparent opacity={avatarOpacity} />
       </mesh>
 
       {/* Legs (only when standing) */}
@@ -384,11 +394,11 @@ function Avatar3D({ user, isCurrentUser, isSitting }: { user: User; isCurrentUse
         <>
           <mesh position={[-0.015, 0.05, 0]} castShadow>
             <capsuleGeometry args={[0.013, 0.06, 3, 8]} />
-            <meshStandardMaterial color="#2d2d48" roughness={0.7} />
+            <meshStandardMaterial color="#2d2d48" roughness={0.7} transparent opacity={avatarOpacity} />
           </mesh>
           <mesh position={[0.015, 0.05, 0]} castShadow>
             <capsuleGeometry args={[0.013, 0.06, 3, 8]} />
-            <meshStandardMaterial color="#2d2d48" roughness={0.7} />
+            <meshStandardMaterial color="#2d2d48" roughness={0.7} transparent opacity={avatarOpacity} />
           </mesh>
         </>
       )}
@@ -560,18 +570,53 @@ function OfficeGround() {
   );
 }
 
+// ─── Time-Based Lighting Presets ─────────────────────────────────────────────
+function getTimeLighting() {
+  const hour = new Date().getHours();
+
+  if (hour >= 6 && hour < 9) {
+    // Early morning - warm golden
+    return { sunColor: '#ffcb8e', sunIntensity: 0.6, ambientColor: '#ffe8cc', ambientIntensity: 0.3, skyColor: '#ffd4a0', groundColor: '#e8dcc8', sunPos: [10, 15, 20] as [number, number, number] };
+  } else if (hour >= 9 && hour < 12) {
+    // Morning - bright natural
+    return { sunColor: '#fff5e6', sunIntensity: 0.8, ambientColor: '#f0eadc', ambientIntensity: 0.35, skyColor: '#b1e1ff', groundColor: '#e8dcc8', sunPos: [20, 25, 15] as [number, number, number] };
+  } else if (hour >= 12 && hour < 15) {
+    // Midday - strong overhead
+    return { sunColor: '#fffaf0', sunIntensity: 0.9, ambientColor: '#f5f0e5', ambientIntensity: 0.4, skyColor: '#a0d4ff', groundColor: '#e8dcc8', sunPos: [5, 30, 5] as [number, number, number] };
+  } else if (hour >= 15 && hour < 18) {
+    // Afternoon - warm
+    return { sunColor: '#ffe0b2', sunIntensity: 0.7, ambientColor: '#f0e6d0', ambientIntensity: 0.35, skyColor: '#c8d8ff', groundColor: '#e0d0c0', sunPos: [-15, 20, 20] as [number, number, number] };
+  } else if (hour >= 18 && hour < 21) {
+    // Evening - sunset orange
+    return { sunColor: '#ff9966', sunIntensity: 0.4, ambientColor: '#e8d0b8', ambientIntensity: 0.25, skyColor: '#ff9080', groundColor: '#d0c0b0', sunPos: [-20, 10, 15] as [number, number, number] };
+  } else {
+    // Night - cool blue moonlight
+    return { sunColor: '#8090c0', sunIntensity: 0.2, ambientColor: '#303050', ambientIntensity: 0.15, skyColor: '#1a1a3e', groundColor: '#202030', sunPos: [-10, 15, -10] as [number, number, number] };
+  }
+}
+
 // ─── Lighting System ────────────────────────────────────────────────────────
 function LightingSystem() {
+  const [lighting, setLighting] = useState(getTimeLighting);
+
+  // Update lighting every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => setLighting(getTimeLighting()), 300000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isNight = new Date().getHours() >= 21 || new Date().getHours() < 6;
+
   return (
     <>
       {/* Ambient - soft fill */}
-      <ambientLight intensity={0.35} color="#f0eadc" />
+      <ambientLight intensity={lighting.ambientIntensity} color={lighting.ambientColor} />
 
-      {/* Main directional - sun through windows */}
+      {/* Main directional - sun/moon */}
       <directionalLight
-        position={[20, 25, 15]}
-        intensity={0.8}
-        color="#fff5e6"
+        position={lighting.sunPos}
+        intensity={lighting.sunIntensity}
+        color={lighting.sunColor}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -588,16 +633,16 @@ function LightingSystem() {
       {/* Secondary fill light */}
       <directionalLight
         position={[-15, 12, -10]}
-        intensity={0.2}
-        color="#cce5ff"
+        intensity={isNight ? 0.05 : 0.2}
+        color={isNight ? '#4060a0' : '#cce5ff'}
       />
 
       {/* Hemisphere for sky/ground color bleed */}
       <hemisphereLight
-        args={['#b1e1ff', '#e8dcc8', 0.3]}
+        args={[lighting.skyColor, lighting.groundColor, isNight ? 0.15 : 0.3]}
       />
 
-      {/* Overhead office fluorescent lights - strategic placement */}
+      {/* Overhead office fluorescent lights - brighter at night */}
       {[
         [15, 6, 18], [30, 6, 18], [45, 6, 18],
         [15, 6, 35], [30, 6, 35], [45, 6, 35],
@@ -605,8 +650,8 @@ function LightingSystem() {
         <pointLight
           key={i}
           position={pos as [number, number, number]}
-          intensity={0.3}
-          color="#fff8f0"
+          intensity={isNight ? 0.6 : 0.3}
+          color={isNight ? '#ffe8c0' : '#fff8f0'}
           distance={20}
           decay={2}
         />

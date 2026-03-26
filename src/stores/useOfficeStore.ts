@@ -80,6 +80,21 @@ interface OfficeState {
   setInteractionPrompt: (prompt: { furnitureId: string; label: string; roomId: string } | null) => void;
   sitDown: (furnitureId: string) => void;
   standUp: () => void;
+
+  // Focus mode
+  isFocusMode: boolean;
+  toggleFocusMode: () => void;
+
+  // Desk customization
+  deskItems: Array<{ id: string; type: string; x: number; z: number; color?: string }>;
+  addDeskItem: (item: { id: string; type: string; x: number; z: number; color?: string }) => void;
+  removeDeskItem: (id: string) => void;
+  moveDeskItem: (id: string, x: number, z: number) => void;
+
+  // Walk-up-to-talk
+  proximityPeers: Set<string>;
+  addProximityPeer: (id: string) => void;
+  removeProximityPeer: (id: string) => void;
 }
 
 export const useOfficeStore = create<OfficeState>((set, get) => ({
@@ -245,4 +260,38 @@ export const useOfficeStore = create<OfficeState>((set, get) => ({
       set({ currentUser: { ...user, isSitting: false, sittingFurnitureId: null } });
     }
   },
+
+  // Focus mode
+  isFocusMode: false,
+  toggleFocusMode: () => {
+    const prev = get().isFocusMode;
+    const user = get().currentUser;
+    if (user) {
+      set({
+        isFocusMode: !prev,
+        currentUser: { ...user, status: !prev ? 'dnd' : 'available' },
+      });
+    }
+  },
+
+  // Desk customization
+  deskItems: [],
+  addDeskItem: (item) => set((state) => ({ deskItems: [...state.deskItems, item] })),
+  removeDeskItem: (id) => set((state) => ({ deskItems: state.deskItems.filter(i => i.id !== id) })),
+  moveDeskItem: (id, x, z) => set((state) => ({
+    deskItems: state.deskItems.map(i => i.id === id ? { ...i, x, z } : i),
+  })),
+
+  // Walk-up-to-talk
+  proximityPeers: new Set(),
+  addProximityPeer: (id) => set((state) => {
+    const next = new Set(state.proximityPeers);
+    next.add(id);
+    return { proximityPeers: next };
+  }),
+  removeProximityPeer: (id) => set((state) => {
+    const next = new Set(state.proximityPeers);
+    next.delete(id);
+    return { proximityPeers: next };
+  }),
 }));

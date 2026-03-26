@@ -18,6 +18,7 @@ import NotificationToast from '@/components/ui/NotificationToast';
 import UserProfileModal from '@/components/ui/UserProfileModal';
 import { cn } from '@/lib/utils';
 import { getRoomAt } from '@/data/officeLayout';
+import { checkProximityEvents, clearProximityState } from '@/lib/proximityManager';
 import {
   Wifi, WifiOff, Loader2, Users, MapPin
 } from 'lucide-react';
@@ -270,6 +271,31 @@ export default function OfficePage() {
       });
     });
 
+    socket.on('interaction:nudge', (data: { userId: string; userName: string }) => {
+      addNotification({
+        id: `nudge-${data.userId}-${Date.now()}`,
+        title: 'Nudge',
+        body: `${data.userName} wants your attention`,
+        type: 'wave',
+        timestamp: Date.now(),
+        read: false,
+      });
+      // Play subtle notification sound
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+      } catch {}
+    });
+
     socket.on('notification:received', (data: Notification) => {
       addNotification(data);
     });
@@ -280,25 +306,51 @@ export default function OfficePage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Send movement updates to server
+  // Send movement updates to server + proximity checks
   useEffect(() => {
     if (!currentUser) return;
 
     const socket = getSocket();
+    const { addProximityPeer, removeProximityPeer, users } = useOfficeStore.getState();
+
     const interval = setInterval(() => {
+      const state = useOfficeStore.getState();
+      if (!state.currentUser) return;
+
       socket.emit('user:move', {
-        position: currentUser.position,
-        direction: currentUser.direction,
+        position: state.currentUser.position,
+        direction: state.currentUser.direction,
       });
 
       // Check room transitions
-      const room = getRoomAt(currentUser.position.x, currentUser.position.y);
-      if (room && room.id !== currentUser.currentRoom) {
+      const room = getRoomAt(state.currentUser.position.x, state.currentUser.position.y);
+      if (room && room.id !== state.currentUser.currentRoom) {
         socket.emit('room:join', { roomId: room.id });
       }
+
+      // Proximity walk-up-to-talk events
+      const events = checkProximityEvents(state.currentUser, state.users);
+      events.forEach(evt => {
+        if (evt.type === 'enter') {
+          addProximityPeer(evt.userId);
+          addNotification({
+            id: `prox-${evt.userId}-${Date.now()}`,
+            title: 'Nearby',
+            body: `${evt.userName} is close by`,
+            type: 'system',
+            timestamp: Date.now(),
+            read: false,
+          });
+        } else {
+          removeProximityPeer(evt.userId);
+        }
+      });
     }, 50); // 20 updates per second
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearProximityState();
+    };
   }, [currentUser]);
 
   // Keyboard shortcuts

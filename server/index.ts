@@ -625,6 +625,25 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
+  // ── Nudge (subtle attention grab) ──────────────────────────────────
+  socket.on('interaction:nudge', (data: { targetId: string }) => {
+    const userId = socketToUser.get(socket.id);
+    if (!userId) return;
+
+    const user = users.get(userId);
+    if (!user) return;
+
+    const targetSocketId = Array.from(socketToUser.entries())
+      .find(([, uid]) => uid === data.targetId)?.[0];
+
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('interaction:nudge', {
+        userId,
+        userName: user.name,
+      });
+    }
+  });
+
   // ── Disconnect ────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     const userId = socketToUser.get(socket.id);

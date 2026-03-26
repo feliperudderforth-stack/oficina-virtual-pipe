@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useOfficeStore } from '@/stores/useOfficeStore';
 import { officeFloor } from '@/data/officeLayout';
-import { cn } from '@/lib/utils';
+import { clamp } from '@/lib/utils';
 
 const MINIMAP_SCALE = 0.1;
 const MINIMAP_WIDTH = officeFloor.width * MINIMAP_SCALE;
@@ -11,7 +11,25 @@ const MINIMAP_HEIGHT = officeFloor.height * MINIMAP_SCALE;
 
 export default function MiniMap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { currentUser, users, showMiniMap, cameraOffset, zoom } = useOfficeStore();
+  const { currentUser, users, showMiniMap, cameraOffset, zoom, updateCurrentUserPosition } = useOfficeStore();
+
+  // Teleport on click
+  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !currentUser) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    const worldX = clamp(clickX / MINIMAP_SCALE, 32, officeFloor.width - 32);
+    const worldY = clamp(clickY / MINIMAP_SCALE, 32, officeFloor.height - 32);
+
+    updateCurrentUserPosition({ x: worldX, y: worldY });
+  }, [currentUser, updateCurrentUserPosition]);
 
   useEffect(() => {
     if (!showMiniMap) return;
@@ -106,10 +124,12 @@ export default function MiniMap() {
         <canvas
           ref={canvasRef}
           style={{ width: MINIMAP_WIDTH, height: MINIMAP_HEIGHT }}
-          className="rounded-lg"
+          className="rounded-lg cursor-crosshair"
+          onClick={handleClick}
+          title="Click to teleport"
         />
         <p className="text-[9px] text-gray-400 text-center mt-1 font-medium">
-          {officeFloor.name}
+          Click to teleport · {officeFloor.name}
         </p>
       </div>
     </div>
